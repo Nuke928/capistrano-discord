@@ -1,0 +1,32 @@
+namespace :discord do
+  task :notify_deploy_failed do
+    message = "*#{fetch(:local_user, local_user).strip}* cancelled deployment of #{fetch(:application)} to **#{fetch(:stage)}**"
+
+    fetch(:discord_bot).send_message(fetch(:discord_channel_id), message)
+  end
+
+  task :notify_deploy_started do
+    commits = `git log --no-color --max-count=5 --pretty=format:' - %an: %s' --abbrev-commit --no-merges #{fetch(:previous_revision, "HEAD")}..#{fetch(:current_revision, "HEAD")}`
+    message = "*#{fetch(:local_user, local_user).strip}* is deploying #{fetch(:application)} to **#{fetch(:stage)}**\n"
+    message << commits
+
+    fetch(:discord_bot).send_message(fetch(:discord_channel_id), message)
+  end
+
+  task :notify_deploy_finished do
+    message = "*#{fetch(:local_user, local_user).strip}* finished deploying #{fetch(:application)} to **#{fetch(:stage)}**"
+
+    fetch(:discord_bot).send_message(fetch(:discord_channel_id), message)
+  end
+
+  before 'deploy:updated', 'discord:notify_deploy_started'
+  after 'deploy:finished', 'discord:notify_deploy_finished'
+  before 'deploy:reverted', 'discord:notify_deploy_failed'
+end
+
+namespace :load do
+  task :defaults do
+    require 'discordrb'
+    set(:discord_bot, -> { Discordrb::Bot.new token: fetch(:discord_token), client_id: fetch(:discord_client_id)  })
+  end
+end
